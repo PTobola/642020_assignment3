@@ -1,0 +1,210 @@
+---
+title: "Assignment 3 Fundamentals ML"
+author: "Peter Tobola"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Librarys
+
+```{r}
+library(reshape2)
+library(e1071)
+library(tidyverse)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(class)
+
+```
+
+## read Universal Bank file
+
+```{r}
+UVBank <- read.csv("C:/Users/ptobo/Desktop/Kent State/3 Fundamentals of Machine Learning BA-64060/Assignments/Assignment 2/UniversalBank.csv")
+
+```
+
+## rename personal loan to loan and credit card to cc, then convert to categorical factor
+
+
+```{r}
+
+summary(UVBank)
+
+
+```
+
+```{r}
+names(UVBank)[names(UVBank)=="CreditCard"] <- "CC"
+names(UVBank)[names(UVBank)=="Personal.Loan"] <- "Loan"
+summary(UVBank)
+UVBank$CC <- factor(UVBank$CC, levels = c(0,1)) 
+UVBank$Loan <- factor(UVBank$Loan, levels = c(0,1))
+UVBank$Online <- factor(UVBank$Online, levels = c(0,1))
+
+summary(UVBank)
+
+
+```
+
+## set seed to 123
+
+```{r}
+set.seed(123)
+
+```
+
+## train 60/40
+
+```{r}
+train60 <- sample(nrow(UVBank),.6 * nrow(UVBank))
+train <- UVBank[train60, ]
+valid <- UVBank[-train60, ]
+
+summary(UVBank)
+cat("trainedRows:", nrow(train), "validRows", nrow(valid))
+
+
+```
+
+## melted pivot tables
+
+```{r}
+melted <- melt(train, id.vars = c("CC", "Loan", "Online"), measure.vars = "ID")
+pivot <-  dcast(melted, CC + Loan ~ Online, fun.aggregate = length)
+
+pivot
+
+```
+
+## group by category, CC w/loan
+
+
+```{r}
+x3 <- pivot[pivot$CC == 1 & pivot$Loan == 1, "1"]
+x3
+
+```
+
+## CC, no Loan
+
+```{r}
+x2 <- pivot[pivot$CC == 1 & pivot$Loan == 0, "1"]
+x2
+
+```
+
+## pivot table probability 
+
+```{r}
+prob_x <- x3 / (x3 + x2)
+prob_x
+
+```
+
+
+
+## naive bayes catagories
+
+```{r}
+Loan_Online <-  table(Loan = train$Loan, Online = train$Online)
+Loan_CC <- table(Loan = train$Loan, CC = train$CC)
+
+Loan_Online
+
+Loan_CC
+
+
+
+```
+
+```{r}
+Loan_Online
+
+```
+
+```{r}
+Loan_CC
+
+```
+
+
+## Compute the following quantities means “the probability of A given B”
+
+
+```{r}
+p_i <- Loan_CC["1","1"] / sum(Loan_CC["1",])
+p_i
+
+```
+
+```{r}
+p_ii <- Loan_Online["1", "1"] / sum(Loan_Online["1", ])
+p_ii
+
+```
+
+```{r}
+p_iii <- mean(train$Loan == 1)
+p_iii
+
+```
+
+```{r}
+p_iv <- Loan_CC["0", "1"] / sum(Loan_CC["0", ])
+p_iv
+```
+
+```{r}
+p_v <- Loan_Online["0", "1"] / sum(Loan_Online["0", ])
+p_v
+```
+
+```{r}
+p_vi <- mean(train$Loan == 0)
+
+p_vi
+
+
+```
+
+## Naive Bayes (NB) probability
+
+```{r}
+Numerator <- p_i * p_ii * p_iii
+Denominator <-  Numerator + p_iv * p_v * p_vi
+P_NB <- Numerator/Denominator
+P_NB
+
+```
+
+```{r}
+NB <- naiveBayes(Loan ~ CC + Online, data = train)
+
+NB
+
+```
+
+## new customer
+
+```{r}
+New_Customer <- data.frame(CC = factor(1, levels = c(0,1)), Online = factor(1, levels = c(0, 1)))
+New_Customer
+
+predict(NB, New_Customer, type = "raw")[, "1"]
+
+
+```
+
+## Based on comparison of the Pivot table results; (prob_x <- x3 / (x3 + x2) = 0.1071429) vs (predict(NB, New_Customer, type = "raw")[, "1"]) = 0.1105637, Pivot probability is more accurate based on zero assumptions with smaller datasets, whereas NB uses small biased assumptions used to identify patterns resulting in a slightly higher prediction value that may be considered negligible.
+      
+
+
+
